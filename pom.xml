@@ -19,9 +19,9 @@
   </properties>
 
   <scm>
-    <connection>scm:git:git://github.com/mcasters/MaxMindGeoIPLookup.git</connection>
-    <developerConnection>scm:git:git@github.com:mcasters/MaxMindGeoIPLookup.git</developerConnection>
-    <url>http://github.com/mcasters/MaxMindGeoIPLookup/tree/master</url>
+    <connection>scm:git:git://github.com/matthewtckr/MaxMindGeoIPLookup.git</connection>
+    <developerConnection>scm:git:git@github.com:matthewtckr/MaxMindGeoIPLookup.git</developerConnection>
+    <url>http://github.com/matthewtckr/MaxMindGeoIPLookup/tree/master</url>
     <tag>HEAD</tag>
   </scm>
 
