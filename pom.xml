@@ -199,11 +199,4 @@
   </dependencies>
 
   <packaging>jar</packaging>
-
-  <repositories>
-    <repository>
-      <id>Pentaho Artifactory</id>
-      <url>http://repo.pentaho.org/artifactory/repo</url>
-    </repository>
-  </repositories>
 </project>
