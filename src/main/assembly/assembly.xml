@@ -6,7 +6,7 @@
 	<formats>
 		<format>zip</format>
 	</formats>
-	<baseDirectory>${project.artifactId}</baseDirectory>
+	<baseDirectory>${MarketplaceID}</baseDirectory>
 	<fileSets>
 		<fileSet>
 			<directory>${project.build.directory}</directory>
