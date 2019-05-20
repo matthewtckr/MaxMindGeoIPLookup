@@ -5,18 +5,26 @@
  */package com.maxmind.geoip;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.InetAddress;
 
+import org.apache.commons.vfs2.FileObject;
 import org.pentaho.di.core.Const;
+import org.pentaho.di.core.exception.KettleFileException;
 import org.pentaho.di.core.exception.KettlePluginException;
 import org.pentaho.di.core.row.RowMetaInterface;
 import org.pentaho.di.core.row.ValueMetaInterface;
 import org.pentaho.di.core.row.value.ValueMetaFactory;
+import org.pentaho.di.core.vfs.KettleVFS;
 
-import com.maxmind.geoip.Country;
-import com.maxmind.geoip.Location;
-import com.maxmind.geoip.LookupService;
-import com.maxmind.geoip.regionName;
-import com.maxmind.geoip.timeZone;
+import com.google.common.net.InetAddresses;
+import com.maxmind.db.CHMCache;
+import com.maxmind.geoip2.exception.GeoIp2Exception;
+import com.maxmind.geoip2.model.CityResponse;
+import com.maxmind.geoip2.model.CountryResponse;
+import com.maxmind.geoip2.model.DomainResponse;
+import com.maxmind.geoip2.model.IspResponse;
+import com.maxmind.geoip2.DatabaseReader;
 
 /*
  * Encapsulates metadata about the individual MaxMind database files.  
@@ -29,7 +37,7 @@ import com.maxmind.geoip.timeZone;
  * 
  */
 public abstract class MaxMindDatabase {
-  LookupService lookupService = null;
+  DatabaseReader lookupService = null;
 
   // TODO: Default values needs to handle non string types for long and lat on city DB.  Convert this to object and 
   // have the setter verify the type and do the conversion so it is ready at runtime.
@@ -48,8 +56,10 @@ public abstract class MaxMindDatabase {
    * of this method is assumed to not violate that size
    * @param firstNewFieldIndex The index of the outputRow (column) to start adding the data to
    * @param ip The ip address to lookup
+ * @throws GeoIp2Exception 
+ * @throws IOException 
    */
-  public abstract void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip);
+  public abstract void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) throws IOException, GeoIp2Exception;
 
   /**
    * Sets the fields (columns) and metadata that will be returned when getRowData() is called.  Each of these arrays 
@@ -115,9 +125,12 @@ public abstract class MaxMindDatabase {
    * 
    * @param dbLocation String representing the path of the database file used by File class
    * @throws IOException
+ * @throws KettleFileException 
    */
-  public void setDbLocation(String dbLocation) throws IOException {
-    lookupService = MaxMindGeoIP.initLookupService(dbLocation);
+  public void setDbLocation(String dbLocation) throws IOException, KettleFileException {
+    FileObject dbFile = KettleVFS.getFileObject(dbLocation);
+    InputStream dbStream = KettleVFS.getInputStream(dbFile);
+    lookupService = new DatabaseReader.Builder(dbStream).withCache(new CHMCache()).build();
   }
 
   /**
@@ -129,7 +142,7 @@ public abstract class MaxMindDatabase {
    * @param ip
    * @return
    */
-  public final long getAddressFromIpV4(String ip) {
+  /*public final long getAddressFromIpV4(String ip) {
     if (ip == null)
       return 0;
     int length = ip.length();
@@ -148,9 +161,12 @@ public abstract class MaxMindDatabase {
     }
     result += block << ((3 - blockNumber) * 8);
     return result;
+  }*/
+  public final InetAddress getAddressFromIpV4(String ip) {
+    return InetAddresses.forString(ip);
   }
   
-  public LookupService getLookupService() {
+  public DatabaseReader getLookupService() {
     return lookupService;
   }
 }
@@ -179,44 +195,44 @@ interface IMaxmindMetaInterface {
 class MaxMindCityData extends MaxMindDatabase {
   enum CityFields implements IMaxmindMetaInterface {
     country_code(ValueMetaInterface.TYPE_STRING, 2, 0) {
-      Object getVal(Location l) {
-        return (l.countryCode);
+      Object getVal(CityResponse l) {
+        return (l.getCountry().getIsoCode());
       }
     },
     country_name(ValueMetaInterface.TYPE_STRING, 50, 0) {
-      Object getVal(Location l) {
-        return (l.countryName);
+      Object getVal(CityResponse l) {
+        return (l.getCountry().getName());
       }
     },
     region_code(ValueMetaInterface.TYPE_STRING, 2, 0) {
-      Object getVal(Location l) {
-        return (l.region);
+      Object getVal(CityResponse l) {
+        return (l.getMostSpecificSubdivision().getIsoCode());
       }
     },
     region_name(ValueMetaInterface.TYPE_STRING, 50, 0) {
-      Object getVal(Location l) {
-        return (regionName.regionNameByCode(l.countryCode, l.region));
+      Object getVal(CityResponse l) {
+        return (l.getMostSpecificSubdivision().getName());
       }
     },
     city_name(ValueMetaInterface.TYPE_STRING, 255, 0) {
-      Object getVal(Location l) {
-        return (l.city);
+      Object getVal(CityResponse l) {
+        return (l.getCity().getName());
       }
     },
     latitude(ValueMetaInterface.TYPE_NUMBER, 10, 4) {
-      Object getVal(Location l) {
-        return ((double) l.latitude);
+      Object getVal(CityResponse l) {
+        return ((double) l.getLocation().getLatitude());
       }
     },
     longitude(ValueMetaInterface.TYPE_NUMBER, 10, 4) {
-      Object getVal(Location l) {
+      Object getVal(CityResponse l) {
         return ((double) 
-            l.longitude);
+            l.getLocation().getLongitude());
       }
     },
     timezone(ValueMetaInterface.TYPE_STRING, 255, 0) {
-      Object getVal(Location l) {
-        return (timeZone.timeZoneByCountryAndRegion(l.countryCode, l.region));
+      Object getVal(CityResponse l) {
+        return (l.getLocation().getTimeZone());
       }
     };
 
@@ -234,7 +250,7 @@ class MaxMindCityData extends MaxMindDatabase {
       return (valueMeta);
     }
 
-    abstract Object getVal(Location l);
+    abstract Object getVal(CityResponse l);
   }
 
   CityFields[] selectedFields = new CityFields[0];
@@ -258,8 +274,9 @@ class MaxMindCityData extends MaxMindDatabase {
   }
 
   @Override
-  public void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) {
-    Location location = getLookupService().getLocation(getAddressFromIpV4(ip));
+  public void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) throws IOException, GeoIp2Exception {
+    CityResponse location = getLookupService().city(getAddressFromIpV4(ip));
+    //Location location = getLookupService().getLocation(getAddressFromIpV4(ip));
     if (location != null) {
       Object o;
       for ( int i = 0; i < selectedFields.length; ++i) {
@@ -280,13 +297,13 @@ class MaxMindCityData extends MaxMindDatabase {
 class MaxMindCountryData extends MaxMindDatabase {
   enum CountryFields implements IMaxmindMetaInterface {
     country_code(ValueMetaInterface.TYPE_STRING, 2, 0) {
-      Object getVal(Country co) {
-        return (co.getCode());
+      Object getVal(CountryResponse co) {
+        return (co.getCountry().getIsoCode());
       }
     },
     country_name(ValueMetaInterface.TYPE_STRING, 50, 0) {
-      Object getVal(Country co) {
-        return (co.getName());
+      Object getVal(CountryResponse co) {
+        return (co.getCountry().getName());
       }
     };
 
@@ -304,7 +321,7 @@ class MaxMindCountryData extends MaxMindDatabase {
       return (valueMeta);
     }
 
-    abstract Object getVal(Country co);
+    abstract Object getVal(CountryResponse co);
   }
 
   CountryFields[] selectedFields = new CountryFields[0];
@@ -328,8 +345,8 @@ class MaxMindCountryData extends MaxMindDatabase {
   }
 
   @Override
-  public void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) {
-    Country co = getLookupService().getCountry(getAddressFromIpV4(ip));
+  public void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) throws IOException, GeoIp2Exception {
+    CountryResponse co = getLookupService().country(getAddressFromIpV4(ip));
     if (co != null) {
       Object o;
       for ( int i = 0; i < selectedFields.length; ++i) {
@@ -350,8 +367,8 @@ class MaxMindCountryData extends MaxMindDatabase {
 class MaxMindIspData extends MaxMindDatabase {
   enum IspFields implements IMaxmindMetaInterface {
     isp_name(ValueMetaInterface.TYPE_STRING, 255, 0) {
-      Object getVal(LookupService ls, long ipNum) {
-        return (ls.getOrg(ipNum));
+      Object getVal(IspResponse isp) {
+        return (isp.getIsp());
       } // yes, this is correct, they use Org for both ISP and Org DB
     };
 
@@ -369,7 +386,7 @@ class MaxMindIspData extends MaxMindDatabase {
       return (valueMeta);
     }
 
-    abstract Object getVal(LookupService ls, long ipNum);
+    abstract Object getVal(IspResponse isp);
   }
 
   IspFields[] selectedFields = new IspFields[0];
@@ -393,10 +410,10 @@ class MaxMindIspData extends MaxMindDatabase {
   }
 
   @Override
-  public void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) {
+  public void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) throws IOException, GeoIp2Exception {
     Object o;
     for ( int i = 0; i < selectedFields.length; ++i) {
-      o = selectedFields[i].getVal(getLookupService(), getAddressFromIpV4(ip));
+      o = selectedFields[i].getVal(getLookupService().isp(getAddressFromIpV4(ip)));
       outputRow[firstNewFieldIndex++] = (o == null) ? defaultValues[i] : o;
     }
   }
@@ -408,8 +425,8 @@ class MaxMindIspData extends MaxMindDatabase {
 class MaxMindOrgData extends MaxMindDatabase {
   enum OrgFields implements IMaxmindMetaInterface {
     organization_name(ValueMetaInterface.TYPE_STRING, 255, 0) {
-      Object getVal(LookupService ls, long ipNum) {
-        return (ls.getOrg(ipNum));
+      Object getVal(IspResponse isp) {
+        return (isp.getOrganization());
       }
     };
 
@@ -427,7 +444,7 @@ class MaxMindOrgData extends MaxMindDatabase {
       return (valueMeta);
     }
 
-    abstract Object getVal(LookupService ls, long ipNum);
+    abstract Object getVal(IspResponse isp);
   }
 
   OrgFields[] selectedFields = new OrgFields[0];
@@ -451,10 +468,10 @@ class MaxMindOrgData extends MaxMindDatabase {
   }
 
   @Override
-  public void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) {
+  public void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) throws IOException, GeoIp2Exception {
     Object o;
     for ( int i = 0; i < selectedFields.length; ++i) {
-      o = selectedFields[i].getVal(getLookupService(), getAddressFromIpV4(ip));
+      o = selectedFields[i].getVal(getLookupService().isp(getAddressFromIpV4(ip)));
       outputRow[firstNewFieldIndex++] = (o == null) ? defaultValues[i] : o;
     }
   }
@@ -467,8 +484,8 @@ class MaxMindOrgData extends MaxMindDatabase {
 class MaxMindDomainData extends MaxMindDatabase {
   enum DomainFields implements IMaxmindMetaInterface {
     domain_name(ValueMetaInterface.TYPE_STRING, 255, 0) {
-      Object getVal(LookupService ls, long ipNum) {
-        return (ls.getOrg(ipNum));
+      Object getVal(DomainResponse domain) {
+        return (domain.getDomain());
       }
     };
 
@@ -486,7 +503,7 @@ class MaxMindDomainData extends MaxMindDatabase {
       return (valueMeta);
     }
 
-    abstract Object getVal(LookupService ls, long ipNum);
+    abstract Object getVal(DomainResponse domain);
   }
 
   DomainFields[] selectedFields = new DomainFields[0];
@@ -510,14 +527,11 @@ class MaxMindDomainData extends MaxMindDatabase {
   }
 
   @Override
-  public void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) {
+  public void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) throws IOException, GeoIp2Exception {
     Object o;
     for ( int i = 0; i < selectedFields.length; ++i) {
-      o = selectedFields[i].getVal(getLookupService(), getAddressFromIpV4(ip));
+      o = selectedFields[i].getVal(getLookupService().domain(getAddressFromIpV4(ip)));
       outputRow[firstNewFieldIndex++] = (o == null) ? defaultValues[i] : o;
     }
   }
- 
-  
-  
 }

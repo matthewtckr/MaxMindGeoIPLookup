@@ -1,5 +1,7 @@
 package com.maxmind.geoip;
 
+import java.io.IOException;
+
 import org.pentaho.di.core.exception.KettleException;
 import org.pentaho.di.core.exception.KettleValueException;
 import org.pentaho.di.core.row.RowDataUtil;
@@ -11,6 +13,8 @@ import org.pentaho.di.trans.step.StepDataInterface;
 import org.pentaho.di.trans.step.StepInterface;
 import org.pentaho.di.trans.step.StepMeta;
 import org.pentaho.di.trans.step.StepMetaInterface;
+
+import com.maxmind.geoip2.exception.GeoIp2Exception;
 
 
 /*
@@ -69,7 +73,14 @@ public class MaxMindGeoIPLookup extends BaseStep implements StepInterface
       outputRow[i] = r[i];
     }
 
-    maxMindDatabase.getRowData(outputRow, data.firstNewFieldIndex, data.outputRowMeta.getString(r, data.ipAddressFieldIndex) );
+    try {
+		maxMindDatabase.getRowData(outputRow, data.firstNewFieldIndex, data.outputRowMeta.getString(r, data.ipAddressFieldIndex) );
+	} catch (IOException | GeoIp2Exception e) {
+		logError(e.toString());
+		setErrors(1);
+		setOutputDone();
+		return false;
+	}
     
     putRow(data.outputRowMeta, outputRow); // copy row to possible alternate rowset(s).
 

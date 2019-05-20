@@ -2,6 +2,7 @@ package com.maxmind.geoip;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.util.HashMap;
 
@@ -15,12 +16,16 @@ import org.pentaho.di.core.variables.VariableSpace;
 import org.pentaho.di.core.vfs.KettleVFS;
 import org.pentaho.di.ui.core.dialog.ErrorDialog;
 
+import com.maxmind.db.CHMCache;
+import com.maxmind.db.Metadata;
+import com.maxmind.geoip2.DatabaseReader;
+
 /*
  * The Overall management class for all the MaxMind databases
  */
 public class MaxMindGeoIP {
 
-  private static final HashMap<String, WeakReference<LookupService>> globalLookupServices = new HashMap<String, WeakReference<LookupService>>();
+  private static final HashMap<String, WeakReference<DatabaseReader>> globalLookupServices = new HashMap<String, WeakReference<DatabaseReader>>();
   
   /*
    * Should probably change this to enum at some point
@@ -83,20 +88,20 @@ public class MaxMindGeoIP {
    * @return a reference to the global instance of the lookup service
    * @throws IOException
    */
-  public static final synchronized LookupService initLookupService(String dbLocation) throws IOException {
+  public static final synchronized DatabaseReader initLookupService(String dbLocation) throws IOException {
     
-    LookupService ls = null;
-    WeakReference<LookupService> wrLs = globalLookupServices.get(dbLocation);
+    DatabaseReader ls = null;
+    WeakReference<DatabaseReader> wrLs = globalLookupServices.get(dbLocation);
     if ((wrLs == null) || ((ls = wrLs.get()) == null)) {
         
-        File localDbLocation = null;
+        FileObject localDbLocation = null;
 
         try {
             FileObject source = KettleVFS.getFileObject(dbLocation);
             
             FileName dbVfs = source.getName();
             if (dbVfs.getScheme().equals("file")) {
-                localDbLocation = new File( source.getURL().getFile() );
+                localDbLocation = KettleVFS.getFileObject(source.getURL().getFile());
             } else {
                 // It's remote - copy it locally
 
@@ -115,7 +120,7 @@ public class MaxMindGeoIP {
                     
                     // this.log(Level.INFO, "Successfully copied file from " + dbLocation + " to " + localDbFile.getAbsolutePath());
                     //localDbLocation = localDbFile.getAbsolutePath();
-                    localDbLocation = localDbFile.getAbsoluteFile();
+                    localDbLocation = KettleVFS.getFileObject(localDbFileObject.getPublicURIString());
                 }
             }
         } catch (Exception e) {
@@ -123,8 +128,9 @@ public class MaxMindGeoIP {
         }
 
       // Logger.getLogger(MaxMindGeoIP.class.getName()).log(Level.INFO, "GeoIP using database " + localDbLocation);
-      ls = new LookupService(localDbLocation, LookupService.GEOIP_MEMORY_CACHE);  // Cache here for runtime
-      globalLookupServices.put(dbLocation, new WeakReference<LookupService>(ls));
+      InputStream dbStream = KettleVFS.getInputStream(localDbLocation);
+      ls = new DatabaseReader.Builder(dbStream).withCache(new CHMCache()).build();
+      globalLookupServices.put(dbLocation, new WeakReference<DatabaseReader>(ls));
     }
     return ls;
   }
@@ -146,9 +152,10 @@ public class MaxMindGeoIP {
       MaxMindHelper helper = new MaxMindHelper(space, meta);
       helper.setupMaxMindDatabase();
       
-      LookupService ls = helper.getMaxMindDatabase().getLookupService();
-      
-      DatabaseInfo dbInfo = ls.getDatabaseInfo();
+      DatabaseReader ls = helper.getMaxMindDatabase().getLookupService();
+
+      Metadata dbInfo = ls.getMetadata();
+
       dbInfoStr = (dbInfo == null) ? null : dbInfo.toString();
       ls.close();
     } catch (Exception e) {
