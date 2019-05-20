@@ -292,7 +292,7 @@ public class MaxMindGeoIPLookupDialog extends BaseStepDialog implements StepDial
     wbbFilename.addSelectionListener(new SelectionAdapter() {
         public void widgetSelected(SelectionEvent e) {
           FileDialog dialog = new FileDialog(shell, SWT.OPEN);
-          dialog.setFilterExtensions(new String[] { "*.dat", "*" });  //$NON-NLS-1$//$NON-NLS-2$
+          dialog.setFilterExtensions(new String[] { "*.mmdb", "*" });  //$NON-NLS-1$//$NON-NLS-2$
           dialog.setFilterNames(new String[] { "MaxMind GeoIP data", BaseMessages.getString(PKG, "System.FileType.AllFiles") }); //$NON-NLS-2$
 
           if (wFilename.getText() != null) {
