@@ -275,8 +275,8 @@ class MaxMindCityData extends MaxMindDatabase {
 
   @Override
   public void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) throws IOException, GeoIp2Exception {
-    CityResponse location = getLookupService().city(getAddressFromIpV4(ip));
-    //Location location = getLookupService().getLocation(getAddressFromIpV4(ip));
+	InetAddress ipAddr = getAddressFromIpV4(ip);
+    CityResponse location = getLookupService().city(ipAddr);
     if (location != null) {
       Object o;
       for ( int i = 0; i < selectedFields.length; ++i) {
@@ -529,8 +529,9 @@ class MaxMindDomainData extends MaxMindDatabase {
   @Override
   public void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) throws IOException, GeoIp2Exception {
     Object o;
+    InetAddress ipAddr = getAddressFromIpV4(ip);
     for ( int i = 0; i < selectedFields.length; ++i) {
-      o = selectedFields[i].getVal(getLookupService().domain(getAddressFromIpV4(ip)));
+      o = selectedFields[i].getVal(getLookupService().domain(ipAddr));
       outputRow[firstNewFieldIndex++] = (o == null) ? defaultValues[i] : o;
     }
   }

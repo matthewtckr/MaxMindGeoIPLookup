@@ -4,7 +4,7 @@
   <parent>
     <groupId>org.pentaho</groupId>
     <artifactId>pentaho-ce-jar-parent-pom</artifactId>
-    <version>1.1.8</version>
+    <version>8.1.0.0-365</version>
   </parent>
 
   <groupId>org.pentaho.pdi</groupId>
@@ -15,7 +15,7 @@
   <properties>
     <maxmind.geoip-api.version>2.12.0</maxmind.geoip-api.version>
     <kettle.version>6.1.0.1-196</kettle.version>
-    <dependency.mockito.version>1.10.19</dependency.mockito.version>
+    <dependency.mockito.version>2.27.0</dependency.mockito.version>
     <MarketplaceID>MaxMindGeoIPLookup</MarketplaceID>
     <dependency.guava.version>27.1-jre</dependency.guava.version>
   </properties>
@@ -194,7 +194,7 @@
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
-      <artifactId>mockito-all</artifactId>
+      <artifactId>mockito-core</artifactId>
       <version>${dependency.mockito.version}</version>
       <scope>test</scope>
     </dependency>

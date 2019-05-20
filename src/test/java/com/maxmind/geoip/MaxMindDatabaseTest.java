@@ -1,10 +1,15 @@
 package com.maxmind.geoip;
 
 import static org.junit.Assert.assertEquals;
-import static org.mockito.Matchers.anyLong;
+import static org.junit.Assert.assertNotNull;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.net.InetAddress;
+import java.util.Arrays;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -13,11 +18,22 @@ import org.pentaho.di.core.plugins.PluginRegistry;
 import org.pentaho.di.core.row.ValueMetaInterface;
 import org.pentaho.di.core.row.value.ValueMetaPluginType;
 
+import com.google.common.collect.ImmutableMap;
 import com.maxmind.geoip.MaxMindCityData.CityFields;
 import com.maxmind.geoip.MaxMindCountryData.CountryFields;
 import com.maxmind.geoip.MaxMindDomainData.DomainFields;
 import com.maxmind.geoip.MaxMindIspData.IspFields;
 import com.maxmind.geoip.MaxMindOrgData.OrgFields;
+import com.maxmind.geoip2.DatabaseReader;
+import com.maxmind.geoip2.exception.GeoIp2Exception;
+import com.maxmind.geoip2.model.CityResponse;
+import com.maxmind.geoip2.model.CountryResponse;
+import com.maxmind.geoip2.model.DomainResponse;
+import com.maxmind.geoip2.model.IspResponse;
+import com.maxmind.geoip2.record.City;
+import com.maxmind.geoip2.record.Country;
+import com.maxmind.geoip2.record.Location;
+import com.maxmind.geoip2.record.Subdivision;
 
 public class MaxMindDatabaseTest { 
 
@@ -86,14 +102,14 @@ public class MaxMindDatabaseTest {
   }
 
   @Test
-  public void testCountryData() {
+  public void testCountryData() throws IOException, GeoIp2Exception {
     MaxMindCountryData data = spy( new MaxMindCountryData() );
-    LookupService service = mock( LookupService.class );
-    Country country = mock( Country.class );
-    when( country.getName() ).thenReturn( "TestCountry" );
-    when( country.getCode() ).thenReturn( "TC" );
+    DatabaseReader service = mock( DatabaseReader.class );
+    CountryResponse countryResponse = mock( CountryResponse.class );
+    Country country = new Country( Arrays.asList( "en-us" ), null, null, "TC", ImmutableMap.of( "en-us", "TestCountry" ) );
     when( data.getLookupService() ).thenReturn( service );
-    when( service.getCountry( anyLong() ) ).thenReturn( country );
+    when( countryResponse.getCountry() ).thenReturn( country );
+    when( service.country( any(InetAddress.class) ) ).thenReturn( countryResponse );
 
     assertEquals( CountryFields.values().length, data.getAllFields().length );
 
@@ -118,20 +134,22 @@ public class MaxMindDatabaseTest {
   }
 
   @Test
-  public void testCityData() {
+  public void testCityData() throws IOException, GeoIp2Exception {
     final double DELTA = (double) 0.00001;
 
     MaxMindCityData data = spy( new MaxMindCityData() );
-    LookupService service = mock( LookupService.class );
-    Location location = mock( Location.class );
-    location.countryCode = "US";
-    location.countryName = "United States";
-    location.region = "NY";
-    location.city = "TestCity";
-    location.latitude = (float) 128.001;
-    location.longitude = (float) 45.123;
-    when( data.getLookupService() ).thenReturn( service );
-    when( service.getLocation( anyLong() ) ).thenReturn( location );
+    DatabaseReader service = mock( DatabaseReader.class );
+    CityResponse cityResponse = mock( CityResponse.class );
+    Country country = new Country( Arrays.asList( "en-us" ), null, null, "US", ImmutableMap.of( "en-us", "United States" ) );
+    Subdivision subdivision = new Subdivision( Arrays.asList( "en-us" ), null, null, "NY", ImmutableMap.of( "en-us", "New York" ) );
+    City city = new City( Arrays.asList( "en-us" ), null, null, ImmutableMap.of( "en-us", "TestCity" ) );
+    Location location = new Location( null, null, 128.001, 45.123, null, null, "America/New_York" );
+    data.lookupService = service;
+    when( service.city( any(InetAddress.class) ) ).thenReturn( cityResponse );
+    when( cityResponse.getCountry() ).thenReturn( country );
+    when( cityResponse.getMostSpecificSubdivision() ).thenReturn( subdivision );
+    when( cityResponse.getCity() ).thenReturn( city );
+    when( cityResponse.getLocation() ).thenReturn( location );
 
     assertEquals( CityFields.values().length, data.getAllFields().length );
 
@@ -153,6 +171,7 @@ public class MaxMindDatabaseTest {
     assertEquals( CityFields.latitude, data.getSelectedFields()[6] );
     assertEquals( CityFields.longitude, data.getSelectedFields()[7] );
 
+    assertNotNull( data.getLookupService() );
     Object[] rowData = new Object[8];
     data.getRowData( rowData, 0, "1.1.1.1" );
     assertEquals( "US", rowData[0] );
@@ -177,11 +196,12 @@ public class MaxMindDatabaseTest {
   }
 
   @Test
-  public void testDomainData() {
+  public void testDomainData() throws IOException, GeoIp2Exception {
     MaxMindDomainData data = spy( new MaxMindDomainData() );
-    LookupService service = mock( LookupService.class );
-    when( data.getLookupService() ).thenReturn( service );
-    when( service.getOrg( anyLong() ) ).thenReturn( "TestDomain.com" );
+    DatabaseReader service = mock( DatabaseReader.class );
+    data.lookupService = service;
+    DomainResponse domain = new DomainResponse( "TestDomain.com", null );
+    when( service.domain( any( InetAddress.class ) ) ).thenReturn( domain );
 
     assertEquals( DomainFields.values().length, data.getAllFields().length );
     data.setSelectedFields( new String[] { DomainFields.domain_name.name() } );
@@ -198,11 +218,12 @@ public class MaxMindDatabaseTest {
   }
 
   @Test
-  public void testIspData() {
+  public void testIspData() throws IOException, GeoIp2Exception {
     MaxMindIspData data = spy( new MaxMindIspData() );
-    LookupService service = mock( LookupService.class );
-    when( data.getLookupService() ).thenReturn( service );
-    when( service.getOrg( anyLong() ) ).thenReturn( "FooBar Communications" );
+    DatabaseReader service = mock( DatabaseReader.class );
+    data.lookupService = service;
+    IspResponse isp = new IspResponse( null, null, null, "FooBar Communications", null );
+    when( service.isp( any( InetAddress.class ) ) ).thenReturn( isp );
 
     assertEquals( IspFields.values().length, data.getAllFields().length );
     data.setSelectedFields( new String[] { IspFields.isp_name.name() } );
@@ -219,11 +240,12 @@ public class MaxMindDatabaseTest {
   }
 
   @Test
-  public void testOrgData() {
+  public void testOrgData() throws IOException, GeoIp2Exception {
     MaxMindOrgData data = spy( new MaxMindOrgData() );
-    LookupService service = mock( LookupService.class );
-    when( data.getLookupService() ).thenReturn( service );
-    when( service.getOrg( anyLong() ) ).thenReturn( "ACME Corporation" );
+    DatabaseReader service = mock( DatabaseReader.class );
+    data.lookupService = service;
+    IspResponse isp = new IspResponse( null, null, null, null, "ACME Corporation" );
+    when( service.isp( any( InetAddress.class ) ) ).thenReturn( isp );
 
     assertEquals( OrgFields.values().length, data.getAllFields().length );
     data.setSelectedFields( new String[] { OrgFields.organization_name.name() } );
