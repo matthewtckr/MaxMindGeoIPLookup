@@ -9,7 +9,7 @@
 
   <groupId>org.pentaho.pdi</groupId>
   <artifactId>pdi-maxmind-plugin</artifactId>
-  <version>3.0.0</version>
+  <version>3.0.1-SNAPSHOT</version>
   <name>PDI Maxmind GeoIP Plugin</name>
 
   <properties>
@@ -24,7 +24,7 @@
     <connection>scm:git:git://github.com/matthewtckr/MaxMindGeoIPLookup.git</connection>
     <developerConnection>scm:git:git@github.com:matthewtckr/MaxMindGeoIPLookup.git</developerConnection>
     <url>http://github.com/matthewtckr/MaxMindGeoIPLookup/tree/master</url>
-    <tag>pdi-maxmind-plugin-3.0.0</tag>
+    <tag>HEAD</tag>
   </scm>
 
   <developers>
