@@ -19,6 +19,7 @@ import org.pentaho.di.core.vfs.KettleVFS;
 
 import com.google.common.net.InetAddresses;
 import com.maxmind.db.CHMCache;
+import com.maxmind.geoip2.exception.AddressNotFoundException;
 import com.maxmind.geoip2.exception.GeoIp2Exception;
 import com.maxmind.geoip2.model.CityResponse;
 import com.maxmind.geoip2.model.CountryResponse;
@@ -276,7 +277,12 @@ class MaxMindCityData extends MaxMindDatabase {
   @Override
   public void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) throws IOException, GeoIp2Exception {
 	InetAddress ipAddr = getAddressFromIpV4(ip);
-    CityResponse location = getLookupService().city(ipAddr);
+	CityResponse location = null;
+	try {
+      location = getLookupService().city(ipAddr);
+	} catch (AddressNotFoundException e) {
+	  location = null; //Ignore, use default values
+	}
     if (location != null) {
       Object o;
       for ( int i = 0; i < selectedFields.length; ++i) {
@@ -346,7 +352,12 @@ class MaxMindCountryData extends MaxMindDatabase {
 
   @Override
   public void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) throws IOException, GeoIp2Exception {
-    CountryResponse co = getLookupService().country(getAddressFromIpV4(ip));
+    CountryResponse co;
+	try {
+      co = getLookupService().country(getAddressFromIpV4(ip));
+	} catch (AddressNotFoundException e) {
+      co = null; // Ignore, use default values
+	}
     if (co != null) {
       Object o;
       for ( int i = 0; i < selectedFields.length; ++i) {
@@ -412,8 +423,14 @@ class MaxMindIspData extends MaxMindDatabase {
   @Override
   public void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) throws IOException, GeoIp2Exception {
     Object o;
+    IspResponse isp = null;
+    try {
+      isp = getLookupService().isp(getAddressFromIpV4(ip));
+    } catch (AddressNotFoundException e) {
+      isp = null; //Ignore, use default values
+    }
     for ( int i = 0; i < selectedFields.length; ++i) {
-      o = selectedFields[i].getVal(getLookupService().isp(getAddressFromIpV4(ip)));
+      o = selectedFields[i].getVal(isp);
       outputRow[firstNewFieldIndex++] = (o == null) ? defaultValues[i] : o;
     }
   }
@@ -470,8 +487,14 @@ class MaxMindOrgData extends MaxMindDatabase {
   @Override
   public void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) throws IOException, GeoIp2Exception {
     Object o;
+    IspResponse isp = null;
+    try {
+      isp = getLookupService().isp(getAddressFromIpV4(ip));
+    } catch (AddressNotFoundException e) {
+      isp = null; //Ignore, use default values
+    }
     for ( int i = 0; i < selectedFields.length; ++i) {
-      o = selectedFields[i].getVal(getLookupService().isp(getAddressFromIpV4(ip)));
+      o = selectedFields[i].getVal(isp);
       outputRow[firstNewFieldIndex++] = (o == null) ? defaultValues[i] : o;
     }
   }
@@ -530,8 +553,14 @@ class MaxMindDomainData extends MaxMindDatabase {
   public void getRowData(Object[] outputRow, int firstNewFieldIndex, String ip) throws IOException, GeoIp2Exception {
     Object o;
     InetAddress ipAddr = getAddressFromIpV4(ip);
+    DomainResponse domain = null;
+    try {
+      domain = getLookupService().domain(ipAddr);
+    } catch (AddressNotFoundException e ) {
+      domain = null; //Ignore, use default values
+    }
     for ( int i = 0; i < selectedFields.length; ++i) {
-      o = selectedFields[i].getVal(getLookupService().domain(ipAddr));
+      o = selectedFields[i].getVal(domain);
       outputRow[firstNewFieldIndex++] = (o == null) ? defaultValues[i] : o;
     }
   }
