@@ -17,7 +17,7 @@
     <kettle.version>6.1.0.1-196</kettle.version>
     <dependency.mockito.version>2.27.0</dependency.mockito.version>
     <MarketplaceID>MaxMindGeoIPLookup</MarketplaceID>
-    <dependency.guava.version>27.1-jre</dependency.guava.version>
+    <dependency.guava.version>28.1-jre</dependency.guava.version>
   </properties>
 
   <scm>
