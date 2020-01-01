@@ -13,7 +13,7 @@
   <name>PDI Maxmind GeoIP Plugin</name>
 
   <properties>
-    <maxmind.geoip-api.version>2.12.0</maxmind.geoip-api.version>
+    <maxmind.geoip-api.version>2.13.0</maxmind.geoip-api.version>
     <kettle.version>6.1.0.1-196</kettle.version>
     <dependency.mockito.version>2.27.0</dependency.mockito.version>
     <MarketplaceID>MaxMindGeoIPLookup</MarketplaceID>
